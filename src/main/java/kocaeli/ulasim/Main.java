@@ -73,24 +73,14 @@ public class Main {
             double taksiUcretSegment1 = 0.0;
             double taksiUcretSegment2 = 0.0;
             if (mesafeKullaniciBaslangic > 3) {
-                taksiUcretSegment1 = RotaHesaplayici.hesaplaTaksiUcreti(
-                        kullaniciKonum,
-                        new Konum(baslangicDurak.getLat(), baslangicDurak.getLon()),
-                        sehirVerisi.getTaxi()
-                );
+                taksiUcretSegment1 = RotaHesaplayici.hesaplaTaksiUcreti(kullaniciKonum, new Konum(baslangicDurak.getLat(), baslangicDurak.getLon()), sehirVerisi.getTaxi());
             }
             if (mesafeHedefDurak > 3) {
-                taksiUcretSegment2 = RotaHesaplayici.hesaplaTaksiUcreti(
-                        new Konum(hedefDurak.getLat(), hedefDurak.getLon()),
-                        hedefKonum,
-                        sehirVerisi.getTaxi()
-                );
+                taksiUcretSegment2 = RotaHesaplayici.hesaplaTaksiUcreti(new Konum(hedefDurak.getLat(), hedefDurak.getLon()), hedefKonum, sehirVerisi.getTaxi());
             }
 
             // Rota alternatifleri hesaplanıyor.
-            List<List<Durak>> alternatifRotalar = RotaPlanlayici.tumRotalariHesapla(
-                    graph, baslangicDurak.getId(), hedefDurak.getId()
-            );
+            List<List<Durak>> alternatifRotalar = RotaPlanlayici.tumRotalariHesapla(graph, baslangicDurak.getId(), hedefDurak.getId());
             if (alternatifRotalar.isEmpty()) {
                 System.out.println("Hiç rota bulunamadı.");
             } else {
@@ -135,7 +125,7 @@ public class Main {
                 }
             }
 
-            // Aşağıdaki kısım, örneğin metin tabanlı arayüz için rota yazdırma ve ödeme işlemleri.
+            // Metin tabanlı arayüz için rota yazdırma ve ödeme işlemleri.
             Yolcu yolcu = new OgrenciYolcu("Mehmet Öğrenci");
             double rotaUcreti = RotaHesaplayici.hesaplaRotaUcreti(alternatifRotalar.get(0), 0.1)
                     + taksiUcretSegment1 + taksiUcretSegment2;
@@ -149,12 +139,19 @@ public class Main {
             System.out.println("\n=== Alternatif: Sadece Taksi ===");
             System.out.println("Taksi Ücreti: " + taksiUcreti + " TL");
 
+            // Tahmini varış saati hesaplama: mevcut sistem zamanı + rota süresi
+            RotaPlanlayici.RotaMetrics bestMetrics = RotaPlanlayici.hesaplaRotaMetrics(alternatifRotalar.get(0));
+            long currentTimeMillis = System.currentTimeMillis();
+            long estimatedArrivalMillis = currentTimeMillis + (long)(bestMetrics.toplamSure * 60 * 1000);
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm");
+            String estimatedArrivalTime = sdf.format(new java.util.Date(estimatedArrivalMillis));
+            System.out.println("Tahmini Varış Saati: " + estimatedArrivalTime);
+
             // Kullanıcıya arayüz seçimi soruluyor:
             Scanner scanner = new Scanner(System.in);
             System.out.println("\nHangi arayüzü kullanmak istersiniz? (1: Metin Tabanlı, 2: JavaFX Harita Tabanlı)");
             int secim = scanner.nextInt();
             if (secim == 1) {
-                // Metin tabanlı arayüz
                 TextArayuz.gosterRota(alternatifRotalar.get(0), 0.1, sehirVerisi.getTaxi(), kullaniciKonum, hedefKonum);
             } else if (secim == 2) {
                 javafx.application.Application.launch(DemoUygulamasi.class);

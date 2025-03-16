@@ -4,12 +4,17 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
+
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.concurrent.Worker;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
-import javafx.scene.control.*;
+import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
@@ -21,7 +26,7 @@ import netscape.javascript.JSObject;
 /**
  * DemoUygulamasi: Tek parça kod.
  * - Kocaeli sınır kontrolü
- * - Durak ikonunu "bus_stop" resmi ile gösterme
+ * - Durak ikonunu "bus_stop" resmi ile gösterme (otobüs ve tramvay için ayrı ikonlar)
  * - BFS ile rota arama (en mantıklı/en kısa rota)
  */
 public class DemoUygulamasi extends Application {
@@ -200,10 +205,6 @@ public class DemoUygulamasi extends Application {
             double destLatVal = Double.parseDouble(tfDestLat.getText().trim().replace(',', '.'));
             double destLonVal = Double.parseDouble(tfDestLon.getText().trim().replace(',', '.'));
 
-            // (Nakit, Kredi, KentKart) vb. okuyoruz, ama bu örnekte direkt rota hesaplamaya odaklanacağız
-            // double nakitMiktar = Double.parseDouble(tfNakit.getText().trim().replace(',', '.'));
-            // ...
-
             // Yolcu tipi indirimi
             double indirimOrani = 0.0;
             if ("Öğrenci".equals(yolcuTipi)) {
@@ -252,10 +253,10 @@ public class DemoUygulamasi extends Application {
             for (int i = 0; i < tumRotalar.size(); i++) {
                 List<Durak> rota = tumRotalar.get(i);
                 // Metrikleri hesaplayalım
-                RotaMetrics metrics = hesaplaRotaMetrics(rota);
+                RotaPlanlayici.RotaMetrics metrics = RotaPlanlayici.hesaplaRotaMetrics(rota);
                 // Taksiler eklenecekse:
-                double taksiStart = (startDist > TAKSI_ESEK) ? sehirVerisi.getTaxi().getOpeningFee() + sehirVerisi.getTaxi().getCostPerKm()*startDist : 0;
-                double taksiEnd   = (endDist   > TAKSI_ESEK) ? sehirVerisi.getTaxi().getOpeningFee() + sehirVerisi.getTaxi().getCostPerKm()*endDist   : 0;
+                double taksiStart = (startDist > TAKSI_ESEK) ? sehirVerisi.getTaxi().getOpeningFee() + sehirVerisi.getTaxi().getCostPerKm() * startDist : 0;
+                double taksiEnd   = (endDist   > TAKSI_ESEK) ? sehirVerisi.getTaxi().getOpeningFee() + sehirVerisi.getTaxi().getCostPerKm() * endDist : 0;
                 double totalCost = metrics.toplamUcret + taksiStart + taksiEnd;
 
                 sbAll.append("Rota #").append(i+1).append(": ");
@@ -361,23 +362,23 @@ public class DemoUygulamasi extends Application {
         double sumUcret = 0;
         double sumMesafe = 0;
         double sumSure = 0;
-        for (int i=0; i<rota.size()-1; i++) {
+        for (int i = 0; i < rota.size() - 1; i++) {
             Durak curr = rota.get(i);
-            Durak nxt  = rota.get(i+1);
+            Durak nxt  = rota.get(i + 1);
             // nextStops
             boolean found = false;
             if (curr.getNextStops() != null) {
                 for (NextStop ns : curr.getNextStops()) {
                     if (ns.getStopId().equals(nxt.getId())) {
                         sumUcret += ns.getUcret();
-                        sumMesafe+= ns.getMesafe();
+                        sumMesafe += ns.getMesafe();
                         sumSure  += ns.getSure();
                         found = true;
                         break;
                     }
                 }
             }
-            if (!found && curr.getTransfer()!=null) {
+            if (!found && curr.getTransfer() != null) {
                 if (curr.getTransfer().getTransferStopId().equals(nxt.getId())) {
                     sumUcret += curr.getTransfer().getTransferUcret();
                     sumSure  += curr.getTransfer().getTransferSure();
@@ -429,6 +430,7 @@ public class DemoUygulamasi extends Application {
     /**
      * createMapHTML:
      * Durak ikonunu "bus_stop" resmi (örnek URL) ile gösteriyoruz.
+     * Ayrıca tramvay durakları için ayrı bir ikon tanımladık.
      */
     private String createMapHTML() {
         // stopsJSArray: JSON verisi client side'da durak konumlarını ekrana basmak için
@@ -456,7 +458,6 @@ public class DemoUygulamasi extends Application {
             "    return originalOnDown.call(this, e);\n" +
             "  };\n" +
             "}";
-
         String iconDefinitions =
             "// startMarker (red), destMarker (blue)\n" +
             "var redIcon = L.icon({\n" +
@@ -471,24 +472,32 @@ public class DemoUygulamasi extends Application {
             "  iconAnchor: [16, 32],\n" +
             "  popupAnchor: [0, -32]\n" +
             "});\n" +
-            "// bus_stop icon (örnek)\n" +
+            "// bus_stop icon (örnek) - Kendi sunucunuzdaki veya internette erişilebilir URL kullanın\n" +
             "var busStopIcon = L.icon({\n" +
-            "  iconUrl: 'https://cdn-icons-png.flaticon.com/512/2980/2980445.png',\n" +
+            "  iconUrl: 'file:///C:/Users/HP/OneDrive/Masaüstü/Maven2/demo/src/main/java/kocaeli/ulasim/resimdurak.jpg'\r\n" + //
+                                ",\n" +
+            "  iconSize: [32, 32],\n" +
+            "  iconAnchor: [16, 32],\n" +
+            "  popupAnchor: [0, -32]\n" +
+            "});\n" +
+            "// tram_stop icon (örnek) - Tramvay durakları için farklı bir resim\n" +
+            "var tramStopIcon = L.icon({\n" +
+            "  iconUrl: 'file:///C:/Users/HP/OneDrive/Masaüstü/Maven2/demo/src/main/java/kocaeli/ulasim/tramvay.jpeg'\r\n" + //
+                                ",\n" +
             "  iconSize: [32, 32],\n" +
             "  iconAnchor: [16, 32],\n" +
             "  popupAnchor: [0, -32]\n" +
             "});\n";
-
         String extraFunctions =
             "function haversineDistance(lat1, lon1, lat2, lon2) {\n" +
             "  var R = 6371;\n" +
             "  var dLat = (lat2 - lat1) * Math.PI / 180;\n" +
             "  var dLon = (lon2 - lon1) * Math.PI / 180;\n" +
-            "  var a = Math.sin(dLat/2)*Math.sin(dLat/2) +\n" +
-            "          Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*\n" +
-            "          Math.sin(dLon/2)*Math.sin(dLon/2);\n" +
-            "  var c = 2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));\n" +
-            "  return R*c;\n" +
+            "  var a = Math.sin(dLat/2) * Math.sin(dLat/2) +\n" +
+            "          Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) *\n" +
+            "          Math.sin(dLon/2) * Math.sin(dLon/2);\n" +
+            "  var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));\n" +
+            "  return R * c;\n" +
             "}\n" +
             "function findNearestStop(lat, lon) {\n" +
             "  var nearest = null;\n" +
@@ -502,23 +511,21 @@ public class DemoUygulamasi extends Application {
             "function calculateTaxiFare(distance) {\n" +
             "  var openingFee = 10;\n" +
             "  var perKm = 4;\n" +
-            "  return openingFee + (perKm*distance);\n" +
+            "  return openingFee + (perKm * distance);\n" +
             "}\n" +
             "function updateRouteInfo(startData, destData) {\n" +
-            "  var infoText = 'Başlangıç Durak: '+startData.stop.name+' ('+startData.distance.toFixed(2)+' km)\\n';\n" +
-            "  infoText += 'Hedef Durak: '+destData.stop.name+' ('+destData.distance.toFixed(2)+' km)\\n';\n" +
-            "  if(startData.distance>3) {\n" +
-            "    infoText+='Başlangıç için taksi önerisi: '+calculateTaxiFare(startData.distance).toFixed(2)+' TL\\n';\n" +
+            "  var infoText = 'Başlangıç Durak: ' + startData.stop.name + ' (' + startData.distance.toFixed(2) + ' km)\\n';\n" +
+            "  infoText += 'Hedef Durak: ' + destData.stop.name + ' (' + destData.distance.toFixed(2) + ' km)\\n';\n" +
+            "  if(startData.distance > 3) {\n" +
+            "    infoText += 'Başlangıç için taksi önerisi: ' + calculateTaxiFare(startData.distance).toFixed(2) + ' TL\\n';\n" +
             "  }\n" +
-            
-            "  if(destData.distance>3) {\n" +
-            "    infoText+='Hedef için taksi önerisi: '+calculateTaxiFare(destData.distance).toFixed(2)+' TL\\n';\n" +
+            "  if(destData.distance > 3) {\n" +
+            "    infoText += 'Hedef için taksi önerisi: ' + calculateTaxiFare(destData.distance).toFixed(2) + ' TL\\n';\n" +
             "  }\n" +
             "  if(window.javaApp) {\n" +
             "    window.javaApp.updateRouteSummary(infoText);\n" +
             "  }\n" +
             "}";
-
         String extraHTML =
             "<div id='routeInfo' style='position:absolute;bottom:10px;left:10px;background:white;padding:10px;z-index:1000;max-width:300px;'></div>";
 
@@ -564,34 +571,34 @@ public class DemoUygulamasi extends Application {
             + "      else if(type==='dest'){ javaApp.updateDestinationLocation(latlng.lat, latlng.lng); }\n"
             + "    }\n"
             + "    if(startMarker && destMarker){\n"
-            + "      var startPos=startMarker.getLatLng();\n"
-            + "      var destPos=destMarker.getLatLng();\n"
-            + "      var startData=findNearestStop(startPos.lat, startPos.lng);\n"
-            + "      var destData=findNearestStop(destPos.lat, destPos.lng);\n"
-            + "      updateRouteInfo(startData,destData);\n"
+            + "      var startPos = startMarker.getLatLng();\n"
+            + "      var destPos = destMarker.getLatLng();\n"
+            + "      var startData = findNearestStop(startPos.lat, startPos.lng);\n"
+            + "      var destData = findNearestStop(destPos.lat, destPos.lng);\n"
+            + "      updateRouteInfo(startData, destData);\n"
             + "    }\n"
             + "  }\n"
             + "\n"
-            + "  map.on('click',function(e){\n"
+            + "  map.on('click', function(e){\n"
             + "    if(!startMarker){\n"
-            + "      startMarker=L.marker(e.latlng,{draggable:true,icon:redIcon}).addTo(map);\n"
-            + "      startMarker.on('drag',function(evt){updateInfoAndJava(evt.target.getLatLng(),'start');});\n"
-            + "      startMarker.on('dragend',function(evt){updateInfoAndJava(evt.target.getLatLng(),'start');});\n"
-            + "      updateInfoAndJava(e.latlng,'start');\n"
-            + "    }else if(!destMarker){\n"
-            + "      destMarker=L.marker(e.latlng,{draggable:true,icon:blueIcon}).addTo(map);\n"
-            + "      destMarker.on('drag',function(evt){updateInfoAndJava(evt.target.getLatLng(),'dest');});\n"
-            + "      destMarker.on('dragend',function(evt){updateInfoAndJava(evt.target.getLatLng(),'dest');});\n"
-            + "      updateInfoAndJava(e.latlng,'dest');\n"
-            + "    }else{\n"
+            + "      startMarker = L.marker(e.latlng, {draggable:true, icon:redIcon}).addTo(map);\n"
+            + "      startMarker.on('drag', function(evt){updateInfoAndJava(evt.target.getLatLng(), 'start');});\n"
+            + "      startMarker.on('dragend', function(evt){updateInfoAndJava(evt.target.getLatLng(), 'start');});\n"
+            + "      updateInfoAndJava(e.latlng, 'start');\n"
+            + "    } else if(!destMarker){\n"
+            + "      destMarker = L.marker(e.latlng, {draggable:true, icon:blueIcon}).addTo(map);\n"
+            + "      destMarker.on('drag', function(evt){updateInfoAndJava(evt.target.getLatLng(), 'dest');});\n"
+            + "      destMarker.on('dragend', function(evt){updateInfoAndJava(evt.target.getLatLng(), 'dest');});\n"
+            + "      updateInfoAndJava(e.latlng, 'dest');\n"
+            + "    } else {\n"
             + "      destMarker.setLatLng(e.latlng);\n"
-            + "      updateInfoAndJava(e.latlng,'dest');\n"
+            + "      updateInfoAndJava(e.latlng, 'dest');\n"
             + "    }\n"
             + "  });\n"
             + "\n"
             + "  function resetMarkers(){\n"
-            + "    if(startMarker){map.removeLayer(startMarker);startMarker=null;}\n"
-            + "    if(destMarker){map.removeLayer(destMarker);destMarker=null;}\n"
+            + "    if(startMarker){ map.removeLayer(startMarker); startMarker = null; }\n"
+            + "    if(destMarker){ map.removeLayer(destMarker); destMarker = null; }\n"
             + "    document.getElementById('info').innerHTML='Seçilen konum: (0,0)';\n"
             + "    document.getElementById('routeInfo').innerText='';\n"
             + "    if(window.javaApp){\n"
@@ -601,38 +608,33 @@ public class DemoUygulamasi extends Application {
             + "    }\n"
             + "  }\n"
             + "\n"
-            + "  var stops="+stopsJSArray+";\n"
-            + "  // Durakları busStopIcon ile gösterelim\n"
+            + "  var stops = " + stopsJSArray + ";\n"
+            + "  // Durakları, id'sine göre uygun ikonla gösterelim: tram_ için tramStopIcon, bus_ için busStopIcon\n"
             + "  stops.forEach(function(stop){\n"
-            + "    L.marker([stop.lat,stop.lon],{icon:busStopIcon}).addTo(map).bindPopup(stop.name);\n"
+            + "    var iconToUse = busStopIcon; // varsayılan\n"
+            + "    if(stop.id.indexOf('tram_') === 0){\n"
+            + "      iconToUse = tramStopIcon;\n"
+            + "    }\n"
+            + "    L.marker([stop.lat, stop.lon], {icon: iconToUse}).addTo(map).bindPopup(stop.name);\n"
             + "  });\n"
             + "\n"
             + "  // Otobüs durakları -> turuncu polyline\n"
-            + "  var busStops=stops.filter(function(s){return s.id.indexOf('bus_')===0;});\n"
-            + "  if(busStops.length>1){\n"
-            + "    var busCoords=busStops.map(function(s){return[s.lat,s.lon];});\n"
-            + "    L.polyline(busCoords,{color:'orange',weight:3}).addTo(map);\n"
+            + "  var busStops = stops.filter(function(s){ return s.id.indexOf('bus_') === 0; });\n"
+            + "  if(busStops.length > 1){\n"
+            + "    var busCoords = busStops.map(function(s){ return [s.lat, s.lon]; });\n"
+            + "    L.polyline(busCoords, {color:'orange', weight:3}).addTo(map);\n"
             + "  }\n"
             + "  // Tramvay durakları -> mor polyline\n"
-            + "  var tramStops=stops.filter(function(s){return s.id.indexOf('tram_')===0;});\n"
-            + "  if(tramStops.length>1){\n"
-            + "    var tramCoords=tramStops.map(function(s){return[s.lat,s.lon];});\n"
-            + "    L.polyline(tramCoords,{color:'purple',weight:3}).addTo(map);\n"
+            + "  var tramStops = stops.filter(function(s){ return s.id.indexOf('tram_') === 0; });\n"
+            + "  if(tramStops.length > 1){\n"
+            + "    var tramCoords = tramStops.map(function(s){ return [s.lat, s.lon]; });\n"
+            + "    L.polyline(tramCoords, {color:'purple', weight:3}).addTo(map);\n"
             + "  }\n"
             + "</script>\n"
             + "</body>\n"
             + "</html>";
     }
 
-    // Basit bir veri tutucu sınıf: BFS ile rota metrikleri */
-
-    /* 
-    private static class RotaMetrics {
-        double toplamUcret;
-        double toplamMesafe;
-        double toplamSure;
-    }
-*/
     public static void main(String[] args) {
         launch(args);
     }
