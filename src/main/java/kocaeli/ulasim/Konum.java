@@ -1,5 +1,7 @@
 package kocaeli.ulasim;
 
+
+
 public class Konum {
     private double enlem;
     private double boylam;

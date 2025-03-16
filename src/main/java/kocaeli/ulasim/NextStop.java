@@ -1,5 +1,6 @@
 package kocaeli.ulasim;
 
+
 public class NextStop {
     private String stopId;
     private double mesafe;

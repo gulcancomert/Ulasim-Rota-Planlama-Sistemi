@@ -1,5 +1,6 @@
 package kocaeli.ulasim;
 
+
 public class TaksiArac extends Arac {
 
     public TaksiArac(String plaka) {

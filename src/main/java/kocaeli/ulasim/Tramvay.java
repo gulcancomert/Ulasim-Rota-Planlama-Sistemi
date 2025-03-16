@@ -1,5 +1,6 @@
 package kocaeli.ulasim;
 
+
 public class Tramvay extends Arac {
 
     public Tramvay(String plaka) {

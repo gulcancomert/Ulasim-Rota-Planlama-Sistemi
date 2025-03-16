@@ -1,5 +1,6 @@
 package kocaeli.ulasim;
 
+
 public class Taksi {
     private double openingFee;
     private double costPerKm;

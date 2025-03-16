@@ -1,5 +1,7 @@
 package kocaeli.ulasim;
 
+
+
 public abstract class Yolcu {
     private String isim;
 

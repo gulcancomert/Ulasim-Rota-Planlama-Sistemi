@@ -1,7 +1,9 @@
 package kocaeli.ulasim;
 
 
+
 import java.util.List;
+import kocaeli.ulasim.SehirVerisi;
 
 public class SehirVerisi {
     private String city;

@@ -1,5 +1,7 @@
 package kocaeli.ulasim;
 
+
+
 public class KentKartOdeme implements Odeme {
     private double bakiye;
 

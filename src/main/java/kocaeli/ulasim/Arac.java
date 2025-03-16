@@ -1,5 +1,6 @@
 package kocaeli.ulasim;
 
+
 public abstract class Arac {
     private String plaka;
 

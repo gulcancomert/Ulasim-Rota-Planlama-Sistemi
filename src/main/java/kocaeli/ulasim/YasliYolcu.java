@@ -1,5 +1,6 @@
 package kocaeli.ulasim;
 
+
 public class YasliYolcu extends Yolcu {
 
     public YasliYolcu(String isim) {

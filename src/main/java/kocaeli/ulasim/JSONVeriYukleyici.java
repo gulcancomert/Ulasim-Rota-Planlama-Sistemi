@@ -1,5 +1,6 @@
 package kocaeli.ulasim;
 
+
 import java.io.FileReader;
 
 import com.google.gson.Gson;
@@ -9,7 +10,7 @@ public class JSONVeriYukleyici {
 
     /**
      * JSON dosyasını okur ve SehirVerisi nesnesine dönüştürür.
-     * 
+     *
      * @param dosyaYolu JSON dosyasının tam yolu
      * @return SehirVerisi nesnesi
      */
@@ -17,7 +18,7 @@ public class JSONVeriYukleyici {
         try (FileReader reader = new FileReader(dosyaYolu)) {
             Gson gson = new Gson();
             SehirVerisi veri = gson.fromJson(reader, SehirVerisi.class);
-            
+
             // JSON verisi başarılı bir şekilde okunduğunda, verilerin doğruluğunu kontrol et
             if (veri == null) {
                 System.out.println("Veri dosyasındaki içerik hatalı veya eksik.");

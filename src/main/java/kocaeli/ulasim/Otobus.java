@@ -1,5 +1,6 @@
 package kocaeli.ulasim;
 
+
 public class Otobus extends Arac {
 
     public Otobus(String plaka) {

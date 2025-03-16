@@ -1,5 +1,6 @@
 package kocaeli.ulasim;
 
+
 public class Transfer {
     private String transferStopId;
     private int transferSure;

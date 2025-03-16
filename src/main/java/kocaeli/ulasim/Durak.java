@@ -1,5 +1,6 @@
 package kocaeli.ulasim;
 
+
 import java.util.List;
 
 public class Durak {
