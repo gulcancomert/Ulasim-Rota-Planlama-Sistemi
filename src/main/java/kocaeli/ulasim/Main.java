@@ -1,5 +1,6 @@
 package kocaeli.ulasim;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 
@@ -15,17 +16,6 @@ public class Main {
                 * Math.sin(dLon / 2) * Math.sin(dLon / 2);
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return R * c;
-    }
-
-    // Kocaeli sınırları (örnek değerler)
-    private static final double MIN_LAT = 40.70;
-    private static final double MAX_LAT = 40.85;
-    private static final double MIN_LON = 29.90;
-    private static final double MAX_LON = 30.05;
-
-    // Girilen koordinatların Kocaeli sınırları içinde olup olmadığını kontrol eden metod
-    private static boolean isWithinKocaeli(double lat, double lon) {
-        return (lat >= MIN_LAT && lat <= MAX_LAT && lon >= MIN_LON && lon <= MAX_LON);
     }
 
     public static void main(String[] args) {
@@ -46,16 +36,6 @@ public class Main {
             Konum kullaniciKonum = new Konum(40.7769, 29.9780);
             Konum hedefKonum = new Konum(40.7831, 29.9326);
 
-            // Kocaeli sınırları kontrolü
-            if (!isWithinKocaeli(kullaniciKonum.getEnlem(), kullaniciKonum.getBoylam())) {
-                System.out.println("Kullanıcı konumu Kocaeli sınırları dışında!");
-                return;
-            }
-            if (!isWithinKocaeli(hedefKonum.getEnlem(), hedefKonum.getBoylam())) {
-                System.out.println("Hedef konum Kocaeli sınırları dışında!");
-                return;
-            }
-
             // Kullanıcının konumundan en yakın durak ve hedef konumuna en yakın durak tespiti
             Durak baslangicDurak = graph.enYakinDurakBul(kullaniciKonum);
             Durak hedefDurak = graph.enYakinDurakBul(hedefKonum);
@@ -64,8 +44,14 @@ public class Main {
             System.out.println("Hedefe en yakın durak: " + hedefDurak);
 
             // Kullanıcının konumu ile en yakın durak arasındaki mesafeyi hesaplıyoruz.
-            double mesafeKullaniciBaslangic = haversineDistance(kullaniciKonum, new Konum(baslangicDurak.getLat(), baslangicDurak.getLon()));
-            double mesafeHedefDurak = haversineDistance(new Konum(hedefDurak.getLat(), hedefDurak.getLon()), hedefKonum);
+            double mesafeKullaniciBaslangic = haversineDistance(
+                    kullaniciKonum,
+                    new Konum(baslangicDurak.getLat(), baslangicDurak.getLon())
+            );
+            double mesafeHedefDurak = haversineDistance(
+                    new Konum(hedefDurak.getLat(), hedefDurak.getLon()),
+                    hedefKonum
+            );
             System.out.println("Kullanıcı -> Baslangıç Durak Mesafesi: " + mesafeKullaniciBaslangic + " km");
             System.out.println("Hedef Durak -> Hedef Konum Mesafesi: " + mesafeHedefDurak + " km");
 
@@ -73,23 +59,42 @@ public class Main {
             double taksiUcretSegment1 = 0.0;
             double taksiUcretSegment2 = 0.0;
             if (mesafeKullaniciBaslangic > 3) {
-                taksiUcretSegment1 = RotaHesaplayici.hesaplaTaksiUcreti(kullaniciKonum, new Konum(baslangicDurak.getLat(), baslangicDurak.getLon()), sehirVerisi.getTaxi());
+                taksiUcretSegment1 = RotaHesaplayici.hesaplaTaksiUcreti(
+                        kullaniciKonum,
+                        new Konum(baslangicDurak.getLat(), baslangicDurak.getLon()),
+                        sehirVerisi.getTaxi()
+                );
             }
             if (mesafeHedefDurak > 3) {
-                taksiUcretSegment2 = RotaHesaplayici.hesaplaTaksiUcreti(new Konum(hedefDurak.getLat(), hedefDurak.getLon()), hedefKonum, sehirVerisi.getTaxi());
+                taksiUcretSegment2 = RotaHesaplayici.hesaplaTaksiUcreti(
+                        new Konum(hedefDurak.getLat(), hedefDurak.getLon()),
+                        hedefKonum,
+                        sehirVerisi.getTaxi()
+                );
             }
 
             // Rota alternatifleri hesaplanıyor.
-            List<List<Durak>> alternatifRotalar = RotaPlanlayici.tumRotalariHesapla(graph, baslangicDurak.getId(), hedefDurak.getId());
+            List<List<Durak>> alternatifRotalar = RotaPlanlayici.tumRotalariHesapla(
+                    graph, baslangicDurak.getId(), hedefDurak.getId()
+            );
+
+            // === BFS sonuçları boş ise fallback (Sadece Taksi) rotası ekle ===
             if (alternatifRotalar.isEmpty()) {
-                System.out.println("Hiç rota bulunamadı.");
-            } else {
+                System.out.println("Hiç rota bulunamadı, otomatik olarak 'Sadece Taksi' fallback rotası oluşturuluyor...");
+                List<Durak> fallbackRota = new ArrayList<>();
+                fallbackRota.add(baslangicDurak);
+                fallbackRota.add(hedefDurak);
+                alternatifRotalar.add(fallbackRota);
+            }
+
+            if (!alternatifRotalar.isEmpty()) {
                 System.out.println("\n=== Tüm Alternatif Rotalar ===");
                 double bestCost = Double.MAX_VALUE;
                 int bestIndex = -1;
                 for (int i = 0; i < alternatifRotalar.size(); i++) {
                     List<Durak> rota = alternatifRotalar.get(i);
                     RotaPlanlayici.RotaMetrics metrics = RotaPlanlayici.hesaplaRotaMetrics(rota);
+
                     // Toplam ücrete, gerekliyse taksi segmentlerinin ücretini ekliyoruz.
                     double toplamUcret = metrics.toplamUcret + taksiUcretSegment1 + taksiUcretSegment2;
                     System.out.println("Rota " + (i + 1) + ":");
@@ -97,7 +102,8 @@ public class Main {
                         System.out.print(d.getName() + " -> ");
                     }
                     System.out.println("Bitiş");
-                    System.out.println("  Ücret: " + toplamUcret + " TL, Süre: " + metrics.toplamSure + " dk, Mesafe: " + metrics.toplamMesafe + " km");
+                    System.out.println("  Ücret: " + toplamUcret + " TL, Süre: "
+                            + metrics.toplamSure + " dk, Mesafe: " + metrics.toplamMesafe + " km");
                     if (taksiUcretSegment1 > 0) {
                         System.out.println("  (Başlangıç segmenti taksi ücreti: " + taksiUcretSegment1 + " TL)");
                     }
@@ -121,12 +127,14 @@ public class Main {
                         System.out.print(d.getName() + " -> ");
                     }
                     System.out.println("Bitiş");
-                    System.out.println("  Ücret: " + enIyiToplamUcret + " TL, Süre: " + metrics.toplamSure + " dk, Mesafe: " + metrics.toplamMesafe + " km");
+                    System.out.println("  Ücret: " + enIyiToplamUcret + " TL, Süre: "
+                            + metrics.toplamSure + " dk, Mesafe: " + metrics.toplamMesafe + " km");
                 }
             }
 
-            // Metin tabanlı arayüz için rota yazdırma ve ödeme işlemleri.
+            // Aşağıdaki kısım, örneğin metin tabanlı arayüz için rota yazdırma ve ödeme işlemleri.
             Yolcu yolcu = new OgrenciYolcu("Mehmet Öğrenci");
+            // İlk rota alternatifini örnek alıyoruz (en iyisi de yukarıda belirleniyor)
             double rotaUcreti = RotaHesaplayici.hesaplaRotaUcreti(alternatifRotalar.get(0), 0.1)
                     + taksiUcretSegment1 + taksiUcretSegment2;
             double sonUcret = rotaUcreti * (1 - yolcu.getIndirimOrani());
@@ -139,25 +147,19 @@ public class Main {
             System.out.println("\n=== Alternatif: Sadece Taksi ===");
             System.out.println("Taksi Ücreti: " + taksiUcreti + " TL");
 
-            // Tahmini varış saati hesaplama: mevcut sistem zamanı + rota süresi
-            RotaPlanlayici.RotaMetrics bestMetrics = RotaPlanlayici.hesaplaRotaMetrics(alternatifRotalar.get(0));
-            long currentTimeMillis = System.currentTimeMillis();
-            long estimatedArrivalMillis = currentTimeMillis + (long)(bestMetrics.toplamSure * 60 * 1000);
-            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm");
-            String estimatedArrivalTime = sdf.format(new java.util.Date(estimatedArrivalMillis));
-            System.out.println("Tahmini Varış Saati: " + estimatedArrivalTime);
-
             // Kullanıcıya arayüz seçimi soruluyor:
             Scanner scanner = new Scanner(System.in);
             System.out.println("\nHangi arayüzü kullanmak istersiniz? (1: Metin Tabanlı, 2: JavaFX Harita Tabanlı)");
             int secim = scanner.nextInt();
             if (secim == 1) {
-                TextArayuz.gosterRota(alternatifRotalar.get(0), 0.1, sehirVerisi.getTaxi(), kullaniciKonum, hedefKonum);
+                TextArayuz.gosterRota(alternatifRotalar.get(0), 0.1, sehirVerisi.getTaxi(),
+                        kullaniciKonum, hedefKonum);
             } else if (secim == 2) {
                 javafx.application.Application.launch(DemoUygulamasi.class);
             } else {
                 System.out.println("Geçersiz seçim, metin tabanlı arayüz kullanılıyor.");
-                TextArayuz.gosterRota(alternatifRotalar.get(0), 0.1, sehirVerisi.getTaxi(), kullaniciKonum, hedefKonum);
+                TextArayuz.gosterRota(alternatifRotalar.get(0), 0.1, sehirVerisi.getTaxi(),
+                        kullaniciKonum, hedefKonum);
             }
         } else {
             System.out.println("JSON verisi yüklenirken hata oluştu.");

@@ -1,9 +1,7 @@
 package kocaeli.ulasim;
 
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
-import java.util.Queue;
 
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -23,15 +21,9 @@ import javafx.scene.web.WebView;
 import javafx.stage.Stage;
 import netscape.javascript.JSObject;
 
-/**
- * DemoUygulamasi: Tek parça kod.
- * - Kocaeli sınır kontrolü
- * - Durak ikonunu "bus_stop" resmi ile gösterme (otobüs ve tramvay için ayrı ikonlar)
- * - BFS ile rota arama (en mantıklı/en kısa rota)
- */
 public class DemoUygulamasi extends Application {
 
-    // Sol panel alanları
+    // Sol paneldeki alanlar
     private TextField tfCurrentLat;
     private TextField tfCurrentLon;
     private TextField tfDestLat;
@@ -39,25 +31,18 @@ public class DemoUygulamasi extends Application {
     private TextField tfNakit;
     private TextField tfKrediKartLimiti;
     private TextField tfKentKartBakiye;
-    private Label lblCalcSummary;
-    private Label lblRouteSummary;
+    private Label lblCalcSummary;     // Sol panelin altındaki kısa mesaj
+    private Label lblRouteSummary;    // Harita altındaki özet
 
     private WebView webView;
     private Button btnHesapla;
-
     private final double TAKSI_ESEK = 3.0; // 3 km
-
-    // Kocaeli koordinat sınırları
-    private final double MIN_LAT = 40.70;
-    private final double MAX_LAT = 40.85;
-    private final double MIN_LON = 29.90;
-    private final double MAX_LON = 30.05;
 
     @Override
     public void start(Stage primaryStage) {
         primaryStage.setTitle("İzmit Ulaşım Rota Planlama ve Harita Görselleştirme");
 
-        // 1) Sol Panel
+        // 1) Sol Panel: Kullanıcı Girdileri
         Label lblBaslangicZamani = new Label("Seyahat Başlangıç Zamanı:");
         lblBaslangicZamani.setStyle("-fx-font-size: 15px; -fx-font-weight: bold;");
         TextField tfBaslangicZamani = new TextField("2025-04-04 08:00");
@@ -86,17 +71,17 @@ public class DemoUygulamasi extends Application {
 
         Label lblNakit = new Label("Nakit (TL):");
         lblNakit.setStyle("-fx-font-size: 15px; -fx-font-weight: bold;");
-        tfNakit = new TextField("100");
+        tfNakit = new TextField("0");
         tfNakit.setStyle("-fx-font-size: 14px;");
 
         Label lblKrediKart = new Label("Kredi Kartı Limiti (TL):");
         lblKrediKart.setStyle("-fx-font-size: 15px; -fx-font-weight: bold;");
-        tfKrediKartLimiti = new TextField("500");
+        tfKrediKartLimiti = new TextField("0");
         tfKrediKartLimiti.setStyle("-fx-font-size: 14px;");
 
         Label lblKentKart = new Label("KentKart Bakiyesi (TL):");
         lblKentKart.setStyle("-fx-font-size: 15px; -fx-font-weight: bold;");
-        tfKentKartBakiye = new TextField("200");
+        tfKentKartBakiye = new TextField("0");
         tfKentKartBakiye.setStyle("-fx-font-size: 14px;");
 
         btnHesapla = new Button("Hesapla");
@@ -135,12 +120,8 @@ public class DemoUygulamasi extends Application {
         webView.setPrefSize(900, 600);
         webView.setOnContextMenuRequested(e -> e.consume());
         WebEngine webEngine = webView.getEngine();
-
-        // Harita HTML içeriği
         String htmlContent = createMapHTML();
         webEngine.loadContent(htmlContent, "text/html");
-
-        // Harita tam yüklendiğinde JS tarafına Java referansı verelim
         webEngine.getLoadWorker().stateProperty().addListener((obs, oldState, newState) -> {
             if (newState == Worker.State.SUCCEEDED) {
                 JSObject window = (JSObject) webEngine.executeScript("window");
@@ -164,39 +145,15 @@ public class DemoUygulamasi extends Application {
         primaryStage.show();
     }
 
-    // Kullanıcının güncellenen konum değerlerini Kocaeli sınırları içinde tutmak için yardımcı metot
-    private boolean isWithinKocaeli(double lat, double lon) {
-        return (lat >= MIN_LAT && lat <= MAX_LAT && lon >= MIN_LON && lon <= MAX_LON);
-    }
-
-    // Mevcut konum güncelleme: Kocaeli sınır kontrolü
-    public void updateCurrentLocation(double lat, double lon) {
-        if (!isWithinKocaeli(lat, lon)) {
-            System.out.println("Uyarı: Mevcut konum Kocaeli sınırları dışında!");
-            return;
-        }
-        Platform.runLater(() -> {
-            tfCurrentLat.setText(String.format("%.4f", lat));
-            tfCurrentLon.setText(String.format("%.4f", lon));
-        });
-    }
-
-    // Hedef konum güncelleme: Kocaeli sınır kontrolü
-    public void updateDestinationLocation(double lat, double lon) {
-        if (!isWithinKocaeli(lat, lon)) {
-            System.out.println("Uyarı: Hedef konum Kocaeli sınırları dışında!");
-            return;
-        }
-        Platform.runLater(() -> {
-            tfDestLat.setText(String.format("%.4f", lat));
-            tfDestLon.setText(String.format("%.4f", lon));
-        });
-    }
-
     /**
      * calculateNavigation:
      *  - JSON verisini okur, Graph oluşturur, en yakın durakları tespit eder,
-     *    BFS ile tüm alternatif rotaları hesaplar.
+     *    tüm alternatif rotaları hesaplar.
+     *  - Her segmentte transit bağlantısı yoksa yürüyüş mesafesi hesaplanır.
+     *  - Yolcu indirimi uygulanır.
+     *  - Tüm alternatif rotaların adım adım açıklaması hazırlanır.
+     *  - Alternatif ulaşım seçenekleri (🚖, 🚍, 🚋, 🛑) uygun olanlara göre kategori olarak yazılır.
+     *  - Sonuçlar yeni bir pencere (Stage) içinde gösterilir.
      */
     private void calculateNavigation(String yolcuTipi) {
         try {
@@ -204,8 +161,10 @@ public class DemoUygulamasi extends Application {
             double currLon = Double.parseDouble(tfCurrentLon.getText().trim().replace(',', '.'));
             double destLatVal = Double.parseDouble(tfDestLat.getText().trim().replace(',', '.'));
             double destLonVal = Double.parseDouble(tfDestLon.getText().trim().replace(',', '.'));
+            double nakitMiktar = Double.parseDouble(tfNakit.getText().trim().replace(',', '.'));
+            double krediKartLimit = Double.parseDouble(tfKrediKartLimiti.getText().trim().replace(',', '.'));
+            double kentKartMiktar = Double.parseDouble(tfKentKartBakiye.getText().trim().replace(',', '.'));
 
-            // Yolcu tipi indirimi
             double indirimOrani = 0.0;
             if ("Öğrenci".equals(yolcuTipi)) {
                 indirimOrani = 0.5;
@@ -213,7 +172,6 @@ public class DemoUygulamasi extends Application {
                 indirimOrani = 0.3;
             }
 
-            // JSON verisi
             SehirVerisi sehirVerisi = JSONVeriYukleyici.verileriYukle(
                     "C:\\Users\\HP\\OneDrive\\Masaüstü\\Maven2\\demo\\src\\main\\java\\kocaeli\\ulasim\\jsonveri.json"
             );
@@ -228,63 +186,112 @@ public class DemoUygulamasi extends Application {
             Konum currentKonum = new Konum(currLat, currLon);
             Konum destKonum = new Konum(destLatVal, destLonVal);
 
-            // En yakın duraklar
             Durak startDurak = graph.enYakinDurakBul(currentKonum);
             Durak endDurak = graph.enYakinDurakBul(destKonum);
 
-            double startDist = haversineDistance(currentKonum, new Konum(startDurak.getLat(), startDurak.getLon()));
-            double endDist   = haversineDistance(destKonum, new Konum(endDurak.getLat(), endDurak.getLon()));
+            double startDistance = haversineDistance(currentKonum, new Konum(startDurak.getLat(), startDurak.getLon()));
+            double endDistance   = haversineDistance(destKonum, new Konum(endDurak.getLat(), endDurak.getLon()));
 
-            // BFS ile tüm rotaları bulalım
-            List<List<Durak>> tumRotalar = tumRotalariBulBFS(graph, startDurak.getId(), endDurak.getId());
-            if (tumRotalar.isEmpty()) {
-                lblCalcSummary.setText("Rota bulunamadı!");
+            // BFS ile rota arıyoruz
+            List<List<Durak>> alternatifRotalar = RotaPlanlayici.tumRotalariHesapla(
+                    graph, startDurak.getId(), endDurak.getId()
+            );
+
+            // === BFS sonuçları boş ise fallback (Sadece Taksi) rotası ekle ===
+            if (alternatifRotalar.isEmpty()) {
+                lblCalcSummary.setText("Hiç rota bulunamadı, 'Sadece Taksi' fallback rotası oluşturuldu.");
+                List<Durak> fallback = new ArrayList<>();
+                fallback.add(startDurak);
+                fallback.add(endDurak);
+                alternatifRotalar.add(fallback);
+            }
+
+            if (alternatifRotalar.isEmpty()) {
+                // Yine de boşsa
+                lblCalcSummary.setText("Fallback rotası da oluşturulamadı!");
                 return;
             }
 
-            // En iyi rota seçimi
-            double bestCost = Double.MAX_VALUE;
-            int bestIndex = -1;
-            StringBuilder sbAll = new StringBuilder();
-            sbAll.append("Mevcut -> en yakın durak: ").append(startDurak.getName()).append(String.format(" (%.2f km)\n", startDist));
-            sbAll.append("Hedef -> en yakın durak: ").append(endDurak.getName()).append(String.format(" (%.2f km)\n\n", endDist));
+            StringBuilder sb = new StringBuilder();
+            sb.append(String.format("Mevcut Konumun En Yakın Durağı: %s (%.2f km)\n",
+                    startDurak.getName(), startDistance));
+            sb.append(String.format("Hedef Konumun En Yakın Durağı: %s (%.2f km)\n\n",
+                    endDurak.getName(), endDistance));
 
-            sbAll.append("=== Tüm Olası Rotalar ===\n\n");
-            for (int i = 0; i < tumRotalar.size(); i++) {
-                List<Durak> rota = tumRotalar.get(i);
-                // Metrikleri hesaplayalım
-                RotaPlanlayici.RotaMetrics metrics = RotaPlanlayici.hesaplaRotaMetrics(rota);
-                // Taksiler eklenecekse:
-                double taksiStart = (startDist > TAKSI_ESEK) ? sehirVerisi.getTaxi().getOpeningFee() + sehirVerisi.getTaxi().getCostPerKm() * startDist : 0;
-                double taksiEnd   = (endDist   > TAKSI_ESEK) ? sehirVerisi.getTaxi().getOpeningFee() + sehirVerisi.getTaxi().getCostPerKm() * endDist : 0;
-                double totalCost = metrics.toplamUcret + taksiStart + taksiEnd;
+            double taksiUcretStart = 0, taksiUcretEnd = 0;
+            if (startDistance > TAKSI_ESEK) {
+                taksiUcretStart = sehirVerisi.getTaxi().getOpeningFee()
+                        + sehirVerisi.getTaxi().getCostPerKm() * startDistance;
+                sb.append(String.format("Mevcut -> %s: TAKSİ (%.2f km, Ücret: %.2f TL)\n",
+                        startDurak.getName(), startDistance, taksiUcretStart));
+            } else {
+                sb.append(String.format("Mevcut -> %s: YÜRÜYEREK (%.2f km, 0 TL)\n",
+                        startDurak.getName(), startDistance));
+            }
+            if (endDistance > TAKSI_ESEK) {
+                taksiUcretEnd = sehirVerisi.getTaxi().getOpeningFee()
+                        + sehirVerisi.getTaxi().getCostPerKm() * endDistance;
+                sb.append(String.format("%s -> Hedef: TAKSİ (%.2f km, Ücret: %.2f TL)\n\n",
+                        endDurak.getName(), endDistance, taksiUcretEnd));
+            } else {
+                sb.append(String.format("%s -> Hedef: YÜRÜYEREK (%.2f km, 0 TL)\n\n",
+                        endDurak.getName(), endDistance));
+            }
 
-                sbAll.append("Rota #").append(i+1).append(": ");
+            sb.append("=== Tüm Alternatif Rotaların Detayları ===\n\n");
+
+            for (int i = 0; i < alternatifRotalar.size(); i++) {
+                List<Durak> rota = alternatifRotalar.get(i);
+
+                // Kategori belirleme
+                boolean allBus = true;
+                boolean allTram = true;
                 for (Durak d : rota) {
-                    sbAll.append(d.getName()).append(" -> ");
+                    if (!d.getId().startsWith("bus_")) allBus = false;
+                    if (!d.getId().startsWith("tram_")) allTram = false;
                 }
-                sbAll.append("Bitiş\n");
-                sbAll.append(String.format("  Ücret: %.2f TL, Süre: %.0f dk, Mesafe: %.2f km\n", totalCost, metrics.toplamSure, metrics.toplamMesafe));
-                if (totalCost < bestCost) {
-                    bestCost = totalCost;
-                    bestIndex = i;
-                }
-                sbAll.append("\n");
-            }
-            if (bestIndex < 0) {
-                lblCalcSummary.setText("Hiç rota seçilemedi!");
-                return;
-            }
-            // En iyi rota
-            sbAll.append("=== En İyi Rota (#").append(bestIndex+1).append(") ===\n");
-            List<Durak> bestRota = tumRotalar.get(bestIndex);
-            for (Durak d : bestRota) {
-                sbAll.append(d.getName()).append(" -> ");
-            }
-            sbAll.append("Bitiş\n");
+                List<String> kategoriList = new ArrayList<>();
+                if (allBus) kategoriList.add("🚍 Sadece Otobüs");
+                if (allTram) kategoriList.add("🚋 Tramvay Öncelikli");
 
-            // Sonucu ayrı pencerede göster
-            showResultInNewWindow(sbAll.toString());
+                // En az aktarmalı
+                int minSteps = Integer.MAX_VALUE;
+                for (List<Durak> r : alternatifRotalar) {
+                    if (r.size() < minSteps) {
+                        minSteps = r.size();
+                    }
+                }
+                if (rota.size() == minSteps) {
+                    kategoriList.add("🛑 En Az Aktarmalı Rota");
+                }
+
+                sb.append(String.format("----- Alternatif Rota %d -----\n", i + 1));
+                if (!kategoriList.isEmpty()) {
+                    sb.append("Kategori: ").append(String.join(", ", kategoriList)).append("\n");
+                }
+
+                // Adım adım açıklama
+                String rotaDetayi = detayliRotaAciklamasiWithBaslangicVeHedef(
+                        rota, startDistance, endDistance, indirimOrani, sehirVerisi.getTaxi()
+                );
+                sb.append(rotaDetayi);
+
+                RotaPlanlayici.RotaMetrics m = RotaPlanlayici.hesaplaRotaMetrics(rota);
+                double realToplamMesafe = m.toplamMesafe + startDistance + endDistance;
+                double realToplamUcret = (m.toplamUcret + taksiUcretStart + taksiUcretEnd) * (1 - indirimOrani);
+                sb.append(String.format("Toplam Ücret: %.2f TL\n", realToplamUcret));
+                sb.append(String.format("Toplam Mesafe: %.2f km\n", realToplamMesafe));
+                sb.append(String.format("Toplam Süre: %.0f dk\n\n", m.toplamSure));
+            }
+
+            // Sadece taksi (doğrudan)
+            double taxiDirectDist = haversineDistance(currentKonum, destKonum);
+            double taxiDirectCost = sehirVerisi.getTaxi().getOpeningFee()
+                    + sehirVerisi.getTaxi().getCostPerKm() * taxiDirectDist;
+            taxiDirectCost = taxiDirectCost * (1 - indirimOrani);
+            sb.append(String.format("🚖 Sadece Taksi: Doğrudan taksi maliyeti = %.2f TL\n\n", taxiDirectCost));
+
+            showResultInNewWindow(sb.toString());
 
         } catch (Exception e) {
             lblCalcSummary.setText("Hesaplama hatası: " + e.getMessage());
@@ -292,118 +299,126 @@ public class DemoUygulamasi extends Application {
     }
 
     /**
-     * BFS ile tüm rotaları bulur.
-     * "bus_otogar" -> "bus_41burda" gibi
+     * detayliRotaAciklamasiWithBaslangicVeHedef:
+     * - Mevcut konumdan ilk dura (rota.get(0)) olan adımı ve
+     * - Rota içindeki adımları detaylandırır,
+     * - Son olarak, son durağından hedef konuma olan adımı ekler.
      */
-    private List<List<Durak>> tumRotalariBulBFS(Graph graph, String startId, String endId) {
-        List<List<Durak>> allPaths = new ArrayList<>();
-        List<Durak> duraklar = graph.getDurakListesi();
-        Durak start = null, end = null;
-        for (Durak d : duraklar) {
-            if (d.getId().equals(startId)) start = d;
-            if (d.getId().equals(endId))   end = d;
+    private String detayliRotaAciklamasiWithBaslangicVeHedef(
+            List<Durak> rota,
+            double startDistance,
+            double endDistance,
+            double indirimOrani,
+            Taksi taxi
+    ) {
+        StringBuilder sb = new StringBuilder();
+        int stepNo = 1;
+        // Mevcut Konum -> İlk Durak
+        if (startDistance > TAKSI_ESEK) {
+            double taxiCost = taxi.getOpeningFee() + taxi.getCostPerKm() * startDistance;
+            sb.append(String.format(
+                    "%d. Adım: Mevcut Konum -> '%s': TAKSİ (%.2f km, Ücret: %.2f TL)\n",
+                    stepNo, rota.get(0).getName(), startDistance, taxiCost
+            ));
+        } else {
+            sb.append(String.format(
+                    "%d. Adım: Mevcut Konum -> '%s': YÜRÜYEREK (%.2f km, 0 TL)\n",
+                    stepNo, rota.get(0).getName(), startDistance
+            ));
         }
-        if (start == null || end == null) return allPaths;
+        stepNo++;
 
-        // BFS queue: path
-        Queue<List<Durak>> queue = new LinkedList<>();
-        List<Durak> firstPath = new ArrayList<>();
-        firstPath.add(start);
-        queue.add(firstPath);
+        // Rota içindeki geçişler
+        sb.append(detayliRotaAciklamasi(rota, indirimOrani, stepNo));
 
-        while (!queue.isEmpty()) {
-            List<Durak> path = queue.poll();
-            Durak last = path.get(path.size()-1);
-            if (last.getId().equals(endId)) {
-                allPaths.add(path);
-                continue; // BFS ile tüm olası yolları eklemek için continue
-            }
-            // nextStops + transfer
-            if (last.getNextStops() != null) {
-                for (NextStop ns : last.getNextStops()) {
-                    Durak nextDurak = null;
-                    for (Durak dd : duraklar) {
-                        if (dd.getId().equals(ns.getStopId())) {
-                            nextDurak = dd;
-                            break;
-                        }
-                    }
-                    if (nextDurak != null && !path.contains(nextDurak)) {
-                        List<Durak> newPath = new ArrayList<>(path);
-                        newPath.add(nextDurak);
-                        queue.add(newPath);
-                    }
-                }
-            }
-            if (last.getTransfer() != null) {
-                // Transfer
-                String tid = last.getTransfer().getTransferStopId();
-                Durak transferDurak = null;
-                for (Durak dd : duraklar) {
-                    if (dd.getId().equals(tid)) {
-                        transferDurak = dd;
-                        break;
-                    }
-                }
-                if (transferDurak != null && !path.contains(transferDurak)) {
-                    List<Durak> newPath = new ArrayList<>(path);
-                    newPath.add(transferDurak);
-                    queue.add(newPath);
-                }
-            }
+        // Son adım: Son Durak -> Hedef Konum
+        int lastStep = stepNo + rota.size() - 1; // yaklaşık hesap
+        if (endDistance > TAKSI_ESEK) {
+            double taxiCost = taxi.getOpeningFee() + taxi.getCostPerKm() * endDistance;
+            sb.append(String.format(
+                    "%d. Adım: '%s' -> Hedef: TAKSİ (%.2f km, Ücret: %.2f TL)\n",
+                    lastStep, rota.get(rota.size()-1).getName(), endDistance, taxiCost
+            ));
+        } else {
+            sb.append(String.format(
+                    "%d. Adım: '%s' -> Hedef: YÜRÜYEREK (%.2f km, 0 TL)\n",
+                    lastStep, rota.get(rota.size()-1).getName(), endDistance
+            ));
         }
-        return allPaths;
+        return sb.toString();
     }
 
     /**
-     * Rota Metrikleri (toplamUcret, toplamSüre, toplamMesafe)
+     * detayliRotaAciklamasi:
+     * Her adımda transit bilgi varsa onu, yoksa yürüyerek mesafesini (0 TL) gösterir.
      */
-    private RotaMetrics hesaplaRotaMetrics(List<Durak> rota) {
-        double sumUcret = 0;
-        double sumMesafe = 0;
-        double sumSure = 0;
+    private String detayliRotaAciklamasi(List<Durak> rota, double indirimOrani, int startingStep) {
+        StringBuilder sb = new StringBuilder();
+        int stepNo = startingStep;
         for (int i = 0; i < rota.size() - 1; i++) {
             Durak curr = rota.get(i);
-            Durak nxt  = rota.get(i + 1);
-            // nextStops
+            Durak nxt = rota.get(i + 1);
+
+            double cost = 0, mesafe = 0;
+            int sure = 0;
             boolean found = false;
+            String arac = "";
+
             if (curr.getNextStops() != null) {
                 for (NextStop ns : curr.getNextStops()) {
                     if (ns.getStopId().equals(nxt.getId())) {
-                        sumUcret += ns.getUcret();
-                        sumMesafe += ns.getMesafe();
-                        sumSure  += ns.getSure();
+                        cost = ns.getUcret();
+                        mesafe = ns.getMesafe();
+                        sure = ns.getSure();
+                        if (curr.getId().startsWith("bus_") || nxt.getId().startsWith("bus_")) {
+                            arac = "Otobüs";
+                        } else if (curr.getId().startsWith("tram_") || nxt.getId().startsWith("tram_")) {
+                            arac = "Tramvay";
+                        } else {
+                            arac = "Transfer";
+                        }
                         found = true;
                         break;
                     }
                 }
             }
-            if (!found && curr.getTransfer() != null) {
-                if (curr.getTransfer().getTransferStopId().equals(nxt.getId())) {
-                    sumUcret += curr.getTransfer().getTransferUcret();
-                    sumSure  += curr.getTransfer().getTransferSure();
-                    // Mesafe = 0 (transfer)
-                }
+            if (!found && curr.getTransfer() != null
+                    && curr.getTransfer().getTransferStopId().equals(nxt.getId())) {
+                cost = curr.getTransfer().getTransferUcret();
+                sure = curr.getTransfer().getTransferSure();
+                mesafe = 0;
+                arac = "Transfer";
+                found = true;
             }
+
+            sb.append(String.format(
+                    "%d. Adım: '%s' -> '%s' ",
+                    stepNo, curr.getName(), nxt.getName()
+            ));
+
+            if (found) {
+                sb.append(String.format(
+                        "%s (Mesafe: %.2f km, Süre: %d dk, Ücret: %.2f TL)\n",
+                        arac, mesafe, sure, cost * (1 - indirimOrani)
+                ));
+            } else {
+                double walkingDistance = haversineDistance(
+                        new Konum(curr.getLat(), curr.getLon()),
+                        new Konum(nxt.getLat(), nxt.getLon())
+                );
+                sb.append(String.format(
+                        "YÜRÜYEREK (Mesafe: %.2f km, 0 TL)\n",
+                        walkingDistance
+                ));
+            }
+            stepNo++;
         }
-        RotaMetrics rm = new RotaMetrics();
-        rm.toplamUcret  = sumUcret;
-        rm.toplamMesafe = sumMesafe;
-        rm.toplamSure   = sumSure;
-        return rm;
+        return sb.toString();
     }
 
-    // BFS Rota Metrik tutucu
-    private static class RotaMetrics {
-        double toplamUcret;
-        double toplamMesafe;
-        double toplamSure;
-    }
-
-    // Pencerede sonuç göster
     private void showResultInNewWindow(String details) {
         Stage stage = new Stage();
-        stage.setTitle("Rota Detayları");
+        stage.setTitle("Tüm Rotalar - Detaylar");
         TextArea textArea = new TextArea(details);
         textArea.setEditable(false);
         textArea.setWrapText(true);
@@ -415,7 +430,25 @@ public class DemoUygulamasi extends Application {
         stage.show();
     }
 
-    // Haversine
+    public void updateRouteSummary(String summary) {
+        Platform.runLater(() -> lblRouteSummary.setText(summary));
+    }
+
+    // Haritaya tıklayınca gelen konumlar
+    public void updateCurrentLocation(double lat, double lon) {
+        Platform.runLater(() -> {
+            tfCurrentLat.setText(String.format("%.4f", lat));
+            tfCurrentLon.setText(String.format("%.4f", lon));
+        });
+    }
+
+    public void updateDestinationLocation(double lat, double lon) {
+        Platform.runLater(() -> {
+            tfDestLat.setText(String.format("%.4f", lat));
+            tfDestLon.setText(String.format("%.4f", lon));
+        });
+    }
+
     private double haversineDistance(Konum k1, Konum k2) {
         double R = 6371;
         double dLat = Math.toRadians(k2.getEnlem() - k1.getEnlem());
@@ -431,6 +464,9 @@ public class DemoUygulamasi extends Application {
      * createMapHTML:
      * Durak ikonunu "bus_stop" resmi (örnek URL) ile gösteriyoruz.
      * Ayrıca tramvay durakları için ayrı bir ikon tanımladık.
+     * 
+     * Turuncu (otobüs) ve mor (tramvay) hatlar, OSRM üzerinden
+     * ana yolları takip ederek çizilir.
      */
     private String createMapHTML() {
         // stopsJSArray: JSON verisi client side'da durak konumlarını ekrana basmak için
@@ -458,6 +494,7 @@ public class DemoUygulamasi extends Application {
             "    return originalOnDown.call(this, e);\n" +
             "  };\n" +
             "}";
+
         String iconDefinitions =
             "// startMarker (red), destMarker (blue)\n" +
             "var redIcon = L.icon({\n" +
@@ -474,29 +511,28 @@ public class DemoUygulamasi extends Application {
             "});\n" +
             "// bus_stop icon (örnek) - Kendi sunucunuzdaki veya internette erişilebilir URL kullanın\n" +
             "var busStopIcon = L.icon({\n" +
-            "  iconUrl: 'file:///C:/Users/HP/OneDrive/Masaüstü/Maven2/demo/src/main/java/kocaeli/ulasim/resimdurak.jpg'\r\n" + //
-                                ",\n" +
+            "  iconUrl: 'file:///C:/Users/HP/OneDrive/Masaüstü/Maven2/demo/src/main/java/kocaeli/ulasim/resimdurak.jpg',\n" +
             "  iconSize: [32, 32],\n" +
             "  iconAnchor: [16, 32],\n" +
             "  popupAnchor: [0, -32]\n" +
             "});\n" +
             "// tram_stop icon (örnek) - Tramvay durakları için farklı bir resim\n" +
             "var tramStopIcon = L.icon({\n" +
-            "  iconUrl: 'file:///C:/Users/HP/OneDrive/Masaüstü/Maven2/demo/src/main/java/kocaeli/ulasim/tramvay.jpeg'\r\n" + //
-                                ",\n" +
+            "  iconUrl: 'file:///C:/Users/HP/OneDrive/Masaüstü/Maven2/demo/src/main/java/kocaeli/ulasim/tramvay.jpeg',\n" +
             "  iconSize: [32, 32],\n" +
             "  iconAnchor: [16, 32],\n" +
             "  popupAnchor: [0, -32]\n" +
             "});\n";
+
         String extraFunctions =
             "function haversineDistance(lat1, lon1, lat2, lon2) {\n" +
             "  var R = 6371;\n" +
             "  var dLat = (lat2 - lat1) * Math.PI / 180;\n" +
             "  var dLon = (lon2 - lon1) * Math.PI / 180;\n" +
-            "  var a = Math.sin(dLat/2) * Math.sin(dLat/2) +\n" +
+            "  var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +\n" +
             "          Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) *\n" +
             "          Math.sin(dLon/2) * Math.sin(dLon/2);\n" +
-            "  var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));\n" +
+            "  var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));\n" +
             "  return R * c;\n" +
             "}\n" +
             "function findNearestStop(lat, lon) {\n" +
@@ -526,9 +562,11 @@ public class DemoUygulamasi extends Application {
             "    window.javaApp.updateRouteSummary(infoText);\n" +
             "  }\n" +
             "}";
+
         String extraHTML =
             "<div id='routeInfo' style='position:absolute;bottom:10px;left:10px;background:white;padding:10px;z-index:1000;max-width:300px;'></div>";
 
+        // --- HTML İçeriği ---
         return "<!DOCTYPE html>\n"
             + "<html>\n"
             + "<head>\n"
@@ -618,17 +656,52 @@ public class DemoUygulamasi extends Application {
             + "    L.marker([stop.lat, stop.lon], {icon: iconToUse}).addTo(map).bindPopup(stop.name);\n"
             + "  });\n"
             + "\n"
-            + "  // Otobüs durakları -> turuncu polyline\n"
+            + "  // === Otobüs Duraklarını OSRM ile Ana Yollardan Çizelim (Turuncu) ===\n"
             + "  var busStops = stops.filter(function(s){ return s.id.indexOf('bus_') === 0; });\n"
-            + "  if(busStops.length > 1){\n"
-            + "    var busCoords = busStops.map(function(s){ return [s.lat, s.lon]; });\n"
-            + "    L.polyline(busCoords, {color:'orange', weight:3}).addTo(map);\n"
+            + "  for(var i=0; i<busStops.length-1; i++) {\n"
+            + "    (function(i){\n"
+            + "      var from = busStops[i];\n"
+            + "      var to = busStops[i+1];\n"
+            + "      var url = 'https://router.project-osrm.org/route/v1/driving/'\n"
+            + "                + from.lon + ',' + from.lat + ';'\n"
+            + "                + to.lon + ',' + to.lat\n"
+            + "                + '?overview=full&geometries=geojson';\n"
+            + "      fetch(url)\n"
+            + "        .then(function(response){ return response.json(); })\n"
+            + "        .then(function(data){\n"
+            + "          if(data && data.routes && data.routes[0]) {\n"
+            + "            var coords = data.routes[0].geometry.coordinates.map(function(c){\n"
+            + "              return [c[1], c[0]]; // [lat, lon]\n"
+            + "            });\n"
+            + "            L.polyline(coords, {color:'blue', weight:3}).addTo(map);\n"
+            + "          }\n"
+            + "        })\n"
+            + "        .catch(function(err){ console.error('OSRM Hatası:', err); });\n"
+            + "    })(i);\n"
             + "  }\n"
-            + "  // Tramvay durakları -> mor polyline\n"
+            + "\n"
+            + "  // === Tramvay Duraklarını OSRM ile Ana Yollardan Çizelim (Mor) ===\n"
             + "  var tramStops = stops.filter(function(s){ return s.id.indexOf('tram_') === 0; });\n"
-            + "  if(tramStops.length > 1){\n"
-            + "    var tramCoords = tramStops.map(function(s){ return [s.lat, s.lon]; });\n"
-            + "    L.polyline(tramCoords, {color:'purple', weight:3}).addTo(map);\n"
+            + "  for(var j=0; j<tramStops.length-1; j++) {\n"
+            + "    (function(j){\n"
+            + "      var from = tramStops[j];\n"
+            + "      var to = tramStops[j+1];\n"
+            + "      var url = 'https://router.project-osrm.org/route/v1/driving/'\n"
+            + "                + from.lon + ',' + from.lat + ';'\n"
+            + "                + to.lon + ',' + to.lat\n"
+            + "                + '?overview=full&geometries=geojson';\n"
+            + "      fetch(url)\n"
+            + "        .then(function(response){ return response.json(); })\n"
+            + "        .then(function(data){\n"
+            + "          if(data && data.routes && data.routes[0]) {\n"
+            + "            var coords = data.routes[0].geometry.coordinates.map(function(c){\n"
+            + "              return [c[1], c[0]]; // [lat, lon]\n"
+            + "            });\n"
+            + "            L.polyline(coords, {color:'red', weight:3}).addTo(map);\n"
+            + "          }\n"
+            + "        })\n"
+            + "        .catch(function(err){ console.error('OSRM Hatası:', err); });\n"
+            + "    })(j);\n"
             + "  }\n"
             + "</script>\n"
             + "</body>\n"
