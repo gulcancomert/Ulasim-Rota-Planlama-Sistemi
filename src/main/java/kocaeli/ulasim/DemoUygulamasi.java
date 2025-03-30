@@ -153,9 +153,9 @@ public class DemoUygulamasi extends Application {
      *    tüm alternatif rotaları hesaplar (DFS).
      *  - Her segmentte transit bağlantısı yoksa yürüyüş mesafesi hesaplanır.
      *  - Yolcu indirimi uygulanır (Öğrenci, Öğretmen, 65+).
-     *  - Tüm alternatif rotaların adım adım açıklaması hazırlanır.
-     *  - Alternatif ulaşım seçenekleri (🚖, 🚍, 🚋, 🛑) uygun olanlara göre kategori olarak yazılır.
-     *  - Her alternatifin adım açıklamasının sonunda toplam mesafe, süre ve ücret de hesaplanıp yazdırılır.
+     *  - Tüm alternatif rotaların adım adım açıklaması hazırlanır,
+     *    alternatif ulaşım seçenekleri kategori olarak yazılır.
+     *  - Her alternatifin sonunda toplam mesafe, süre ve ücret hesaplanıp yazdırılır.
      *  - Sonuçlar yeni bir pencere (Stage) içinde gösterilir.
      */
     private void calculateNavigation(String yolcuTipi) {
@@ -276,10 +276,43 @@ public class DemoUygulamasi extends Application {
                 double realToplamMesafe = m.toplamMesafe + startDistance + endDistance;
                 // Tüm segment ücretleri + taksi ücretleri -> indirimOrani
                 double realToplamUcret = (m.toplamUcret + taksiUcretStart + taksiUcretEnd) * (1 - indirimOrani);
+                
+                // Rota içindeki yürüyüş süreleri (5 km/s hız) -> Ayrı hesap
+                double extraWalkingTime = 0;
+                for (int j = 0; j < rota.size() - 1; j++) {
+                    Durak curr = rota.get(j);
+                    Durak nxt = rota.get(j + 1);
+                    boolean transitFound = false;
+                    if (curr.getNextStops() != null) {
+                        for (NextStop ns : curr.getNextStops()) {
+                            if (ns.getStopId().equals(nxt.getId())) {
+                                transitFound = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!transitFound && curr.getTransfer() != null &&
+                            curr.getTransfer().getTransferStopId().equals(nxt.getId())) {
+                        transitFound = true;
+                    }
+                    if (!transitFound) {
+                        double walkingDistance = haversineDistance(new Konum(curr.getLat(), curr.getLon()),
+                                                                    new Konum(nxt.getLat(), nxt.getLon()));
+                        extraWalkingTime += hesaplaYurumeSuresi(walkingDistance);
+                    }
+                }
+                // Başlangıç ve hedef için yürüyüş varsa
+                if (startDistance <= TAKSI_ESEK) {
+                    extraWalkingTime += hesaplaYurumeSuresi(startDistance);
+                }
+                if (endDistance <= TAKSI_ESEK) {
+                    extraWalkingTime += hesaplaYurumeSuresi(endDistance);
+                }
+                double totalTime = m.toplamSure + extraWalkingTime;
 
                 sb.append(String.format("Toplam Ücret: %.2f TL\n", realToplamUcret));
                 sb.append(String.format("Toplam Mesafe: %.2f km\n", realToplamMesafe));
-                sb.append(String.format("Toplam Süre: %.0f dk\n\n", m.toplamSure));
+                sb.append(String.format("Toplam Süre: %.0f dk\n\n", totalTime));
             }
 
             // Sadece taksi doğrudan (mevcut konumdan hedef konuma)
@@ -289,11 +322,65 @@ public class DemoUygulamasi extends Application {
             taxiDirectCost = taxiDirectCost * (1 - indirimOrani);
             sb.append(String.format("🚖 Sadece Taksi: Doğrudan taksi maliyeti = %.2f TL\n\n", taxiDirectCost));
 
+            // Split Payment (Bölünmüş Ödeme) Mekanizması Entegrasyonu:
+            double totalCost = taxiDirectCost;
+            double remaining = totalCost;
+            double paidFromKent = 0;
+            double paidFromKredi = 0;
+            double paidFromNakit = 0;
+
+            double kentKartBakiyeVal = Double.parseDouble(tfKentKartBakiye.getText().trim().replace(',', '.'));
+            double krediKartLimitVal = Double.parseDouble(tfKrediKartLimiti.getText().trim().replace(',', '.'));
+            double nakitMiktarVal = Double.parseDouble(tfNakit.getText().trim().replace(',', '.'));
+
+            KentKartOdeme kentKartOdeme = new KentKartOdeme(kentKartBakiyeVal);
+            KrediKartiOdeme krediKartOdeme = new KrediKartiOdeme(krediKartLimitVal);
+            NakitOdeme nakitOdeme = new NakitOdeme(nakitMiktarVal);
+
+            // Öncelikle KentKart ile ödeme yapmaya çalışalım.
+            if (remaining > 0 && kentKartBakiyeVal > 0) {
+                double pay = Math.min(remaining, kentKartBakiyeVal);
+                kentKartOdeme.odemeIsle(pay);
+                paidFromKent = pay;
+                remaining -= pay;
+            }
+            // Ardından kredi kartı üzerinden.
+            if (remaining > 0 && krediKartLimitVal > 0) {
+                double pay = Math.min(remaining, krediKartLimitVal);
+                krediKartOdeme.odemeIsle(pay);
+                paidFromKredi = pay;
+                remaining -= pay;
+            }
+            // Son olarak nakit üzerinden ödeme dene.
+            if (remaining > 0 && nakitMiktarVal > 0) {
+                double pay = Math.min(remaining, nakitMiktarVal);
+                nakitOdeme.odemeIsle(pay);
+                paidFromNakit = pay;
+                remaining -= pay;
+            }
+
+            // İki basamaklı formatlı mesaj
+            String odemeSonucu;
+            if (remaining > 0) {
+                odemeSonucu = String.format("Ödeme yetersiz! Kalan tutar: %.2f TL.", remaining);
+            } else {
+                odemeSonucu = String.format(
+                    "Ödeme başarılı. Ödenen tutarlar - KentKart: %.2f TL, Kredi Kartı: %.2f TL, Nakit: %.2f TL.",
+                    paidFromKent, paidFromKredi, paidFromNakit
+                );
+            }
+            sb.append("Ödeme Sonucu: " + odemeSonucu);
+
             showResultInNewWindow(sb.toString());
 
         } catch (Exception e) {
             lblCalcSummary.setText("Hesaplama hatası: " + e.getMessage());
         }
+    }
+
+    // Ortalama 5 km/s yürüme hızı varsayımıyla yürüyüş süresini (dakika cinsinden) hesaplar.
+    private double hesaplaYurumeSuresi(double km) {
+        return (km / 5.0) * 60.0;
     }
 
     /**
@@ -456,7 +543,6 @@ public class DemoUygulamasi extends Application {
                         "  { \"id\": \"tram_sekapark\", \"name\": \"Sekapark (Tram)\", \"lat\": 40.76200, \"lon\": 29.96550 },\n" +
                         "  { \"id\": \"tram_halkevi\", \"name\": \"Halkevi (Tram)\", \"lat\": 40.76350, \"lon\": 29.93870 }\n" +
                         "]";
-
         String monkeyPatch =
                 "if (L.Draggable && L.Draggable.prototype._onDown) {\n" +
                         "  var originalOnDown = L.Draggable.prototype._onDown;\n" +
@@ -467,7 +553,6 @@ public class DemoUygulamasi extends Application {
                         "    return originalOnDown.call(this, e);\n" +
                         "  };\n" +
                         "}";
-
         String iconDefinitions =
                 "// startMarker (red), destMarker (blue)\n" +
                         "var redIcon = L.icon({\n" +
@@ -496,7 +581,6 @@ public class DemoUygulamasi extends Application {
                         "  iconAnchor: [16, 32],\n" +
                         "  popupAnchor: [0, -32]\n" +
                         "});\n";
-
         String extraFunctions =
                 "function haversineDistance(lat1, lon1, lat2, lon2) {\n" +
                         "  var R = 6371;\n" +
@@ -535,10 +619,8 @@ public class DemoUygulamasi extends Application {
                         "    window.javaApp.updateRouteSummary(infoText);\n" +
                         "  }\n" +
                         "}";
-
         String extraHTML =
                 "<div id='routeInfo' style='position:absolute;bottom:10px;left:10px;background:white;padding:10px;z-index:1000;max-width:300px;'></div>";
-
         return "<!DOCTYPE html>\n"
                 + "<html>\n"
                 + "<head>\n"
