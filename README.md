@@ -1,1 +1,1 @@
-Bu projede, Kocaeli/İzmit özelinde otobüs, tramvay ve taksi ulaşım sistemlerini kapsayan bir rota planlama uygulaması geliştirilmiştir. Kullanıcının mevcut konumu ve hedefi arasında en uygun güzergah; mesafe, süre, ücret ve aktarma sayısı gibi faktörler dikkate alınarak hesaplanır. JavaFX ile görsel arayüz sunulmuş; JSON verileriyle çalışan esnek bir yapı oluşturulmuştur. Farklı yolcu türlerine (öğrenci, öğretmen, yaşlı) indirim, çoklu ödeme yöntemi (nakit, kredi kartı, KentKart) ve harita tabanlı etkileşim desteklenmektedir.
+
