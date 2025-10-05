@@ -147,17 +147,7 @@ public class DemoUygulamasi extends Application {
         primaryStage.show();
     }
 
-    /**
-     * calculateNavigation:
-     *  - JSON verisini okur, Graph oluşturur, en yakın durakları tespit eder,
-     *    tüm alternatif rotaları hesaplar (DFS).
-     *  - Her segmentte transit bağlantısı yoksa yürüyüş mesafesi hesaplanır.
-     *  - Yolcu indirimi uygulanır (Öğrenci, Öğretmen, 65+).
-     *  - Tüm alternatif rotaların adım adım açıklaması hazırlanır,
-     *    alternatif ulaşım seçenekleri kategori olarak yazılır.
-     *  - Her alternatifin sonunda toplam mesafe, süre ve ücret hesaplanıp yazdırılır.
-     *  - Sonuçlar yeni bir pencere (Stage) içinde gösterilir.
-     */
+
     private void calculateNavigation(String yolcuTipi) {
         try {
             double currLat = Double.parseDouble(tfCurrentLat.getText().trim().replace(',', '.'));
