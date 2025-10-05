@@ -16,7 +16,7 @@ public class Graph {
     }
 
     public void baglantiOlustur() {
-        // Her durak için nextStops'ta tanımlı durakları ilişkilendirecek bağlantıları oluşturabilirsiniz.
+  
         System.out.println("Bağlantılar oluşturuldu.");
     }
 
