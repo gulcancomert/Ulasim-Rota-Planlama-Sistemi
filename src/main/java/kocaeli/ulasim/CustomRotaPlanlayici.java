@@ -15,12 +15,7 @@ public class CustomRotaPlanlayici {
         this.distanceCalculator = distanceCalculator;
     }
 
-    /**
-     * Belirtilen başlangıç ve bitiş durakları arasında DFS ile tüm rotaları bulur.
-     * @param startId Başlangıç durak ID'si
-     * @param endId Bitiş durak ID'si
-     * @return Bulunan rota listeleri
-     */
+  
     public List<List<Durak>> calculateRoutes(String startId, String endId) {
         List<List<Durak>> routes = new ArrayList<>();
         Durak start = getDurakById(startId);
