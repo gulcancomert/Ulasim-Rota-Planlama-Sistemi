@@ -75,8 +75,7 @@ public class Main {
             // (Harita arayüzü, DemoUygulamasi sınıfında tanımlı ve start(Stage) metodu ile çalışır.)
             javafx.application.Application.launch(DemoUygulamasi.class);
 
-            // Eğer computed rota bilgilerini haritada göstermek isterseniz,
-            // DemoUygulamasi içinde bu bilgileri tutacak statik değişkenler ayarlayabilirsiniz.
+            
         } else {
             System.out.println("JSON verisi yüklenirken hata oluştu.");
         }
