@@ -16,15 +16,7 @@ import javafx.scene.text.Font;
 import javafx.stage.Stage;
 
 
-/**
- * MapArayuzFX – Canvas tabanlı harita arayüzü.
- *
- * Bu sınıf, JSON dosyasından çekilen durak verilerini kullanarak, otobüs ve tramvay duraklarını,
- * aralarındaki bağlantıları (polyline) çizer. Kullanıcı, Canvas üzerinde ilk tıklamada
- * başlangıç konumunu (marker 1 – mavi) ve ikinci tıklamada hedef konumunu (marker 2 – yeşil) belirler.
- * Marker’lar draggable (sürüklenebilir) olup, her tıklama veya sürüklemede en yakın durak hesaplanır,
- * taksi ücreti (açılış ücreti + km başına ücret) hesaplanır ve rota bilgileri Canvas’ın sol üst köşesine yazılır.
- */
+
 // Durak nesnelerini temsil eden inner sınıf
 class Stop {
     String id;
@@ -85,22 +77,21 @@ public class MapArayuzFX extends Application {
         // İlk çizimde harita, duraklar, polyline ve rota hesaplamaları çizilsin
         drawMap(gc);
 
-        // Fare olayları:
-        // Mouse basıldığında, marker'a yakınlık kontrolü yapılarak hangi marker sürüklenecek belirlenir.
+        
         canvas.addEventHandler(MouseEvent.MOUSE_PRESSED, e -> {
             double clickX = e.getX();
             double clickY = e.getY();
-            // Eğer başlangıç marker henüz belirlenmemişse, tıklama otomatik olarak başlangıç konumu olarak alınır.
+          
             if (!startSet) {
                 updateStartPosition(e);
                 startSet = true;
-                // İlk marker, başlangıç olarak belirlendi.
+             
             } else if (!destSet) {
-                // Eğer hedef marker henüz belirlenmemişse, tıklama hedef konumu olarak alınır.
+                
                 updateDestPosition(e);
                 destSet = true;
             } else {
-                // Eğer her iki marker belirlenmişse, tıklama noktasının hangi marker'a daha yakın olduğunu kontrol edelim.
+                
                 double startX = margin + ((startLon - minLon) / (maxLon - minLon)) * drawWidth;
                 double startY = margin + ((maxLat - startLat) / (maxLat - minLat)) * drawHeight;
                 double destX = margin + ((destLon - minLon) / (maxLon - minLon)) * drawWidth;
@@ -119,7 +110,7 @@ public class MapArayuzFX extends Application {
             drawMap(gc);
         });
 
-        // Mouse sürüklenirken: Eğer bir marker sürükleniyorsa, konum güncellenir.
+
         canvas.addEventHandler(MouseEvent.MOUSE_DRAGGED, e -> {
             if (startSet && destSet) {
                 if (draggingStart != null) {
@@ -137,7 +128,7 @@ public class MapArayuzFX extends Application {
             }
         });
 
-        // Mouse bırakıldığında, sürükleme modu kapatılır.
+   
         canvas.addEventHandler(MouseEvent.MOUSE_RELEASED, e -> draggingStart = null);
 
         Scene scene = new Scene(new Group(canvas));
@@ -145,7 +136,7 @@ public class MapArayuzFX extends Application {
         primaryStage.show();
     }
 
-    // JSON dosyasından durak verilerini yükler (resources/duraklar.json)
+
     private void loadStopsFromJson() {
         try {
             InputStream is = getClass().getResourceAsStream("/duraklar.json");
@@ -161,7 +152,7 @@ public class MapArayuzFX extends Application {
         }
     }
 
-    // Tıklama veya sürükleme sonucu başlangıç konumunu günceller.
+   
     private void updateStartPosition(MouseEvent e) {
         double clickX = e.getX();
         double clickY = e.getY();
@@ -170,7 +161,7 @@ public class MapArayuzFX extends Application {
         System.out.println("Başlangıç Konumu Güncellendi -> Enlem: " + startLat + ", Boylam: " + startLon);
     }
 
-    // Tıklama veya sürükleme sonucu hedef konumunu günceller.
+ 
     private void updateDestPosition(MouseEvent e) {
         double clickX = e.getX();
         double clickY = e.getY();
@@ -179,12 +170,12 @@ public class MapArayuzFX extends Application {
         System.out.println("Hedef Konumu Güncellendi -> Enlem: " + destLat + ", Boylam: " + destLon);
     }
 
-    // Canvas üzerinde haritayı, JSON'dan çekilen durakları, polyline bağlantıları ve rota bilgilerini çizer.
+   
     private void drawMap(GraphicsContext gc) {
         double width = gc.getCanvas().getWidth();
         double height = gc.getCanvas().getHeight();
 
-        // Tuvali temizle
+ 
         gc.setFill(Color.WHITE);
         gc.fillRect(0, 0, width, height);
 
@@ -212,7 +203,7 @@ public class MapArayuzFX extends Application {
             }
         }
 
-        // Otobüs durakları arası bağlantı (orange)
+        // Otobüs durakları arası bağlantı 
         if (stops != null) {
             gc.setStroke(Color.ORANGE);
             gc.setLineWidth(3);
@@ -233,7 +224,7 @@ public class MapArayuzFX extends Application {
             }
         }
 
-        // Tramvay durakları arası bağlantı (purple)
+        // Tramvay durakları arası bağlantı
         if (stops != null) {
             gc.setStroke(Color.PURPLE);
             gc.setLineWidth(3);
@@ -277,8 +268,7 @@ public class MapArayuzFX extends Application {
         gc.setFont(new Font(14));
         gc.fillText(infoText, margin + 10, margin + 20);
 
-        // Seçili konum markerları çizimi: Başlangıç marker (mavi) ve hedef marker (yeşil)
-        // Başlangıç marker sadece eğer belirlenmişse
+      
         if (startSet) {
             int startX = (int) (margin + ((startLon - minLon) / (maxLon - minLon)) * drawWidth);
             int startY = (int) (margin + ((maxLat - startLat) / (maxLat - minLat)) * drawHeight);
@@ -288,7 +278,7 @@ public class MapArayuzFX extends Application {
             gc.setFont(new Font(12));
             gc.fillText(String.format("(%.4f, %.4f)", startLat, startLon), startX + markerRadius + 2, startY);
         }
-        // Hedef marker sadece eğer belirlenmişse
+      
         if (destSet) {
             int destX = (int) (margin + ((destLon - minLon) / (maxLon - minLon)) * drawWidth);
             int destY = (int) (margin + ((maxLat - destLat) / (maxLat - minLat)) * drawHeight);
@@ -300,7 +290,7 @@ public class MapArayuzFX extends Application {
         }
     }
 
-    // Haversine mesafe hesaplama (km cinsinden)
+
     private double haversineDistance(double lat1, double lon1, double lat2, double lon2) {
         double R = 6371; // Dünya yarıçapı (km)
         double dLat = Math.toRadians(lat2 - lat1);
