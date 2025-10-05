@@ -7,13 +7,12 @@ public class KentKartOdeme implements Odeme {
         this.bakiye = bakiye;
     }
     
-    // Varsayılan ödeme, indirimsiz
+ 
     @Override
     public void odemeIsle(double tutar) {
         odemeIsle(tutar, 0.0);
     }
-    
-    // İndirimin uygulanabildiği ödeme metodu
+   
     public void odemeIsle(double tutar, double indirimOrani) {
         double odenecek = tutar * (1 - indirimOrani);
         if (odenecek <= bakiye) {
