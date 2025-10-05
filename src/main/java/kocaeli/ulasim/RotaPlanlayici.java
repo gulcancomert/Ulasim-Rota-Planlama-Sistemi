@@ -5,18 +5,14 @@ import java.util.List;
 
 public class RotaPlanlayici {
 
-    // Rota metriklerini tutan yardımcı sınıf
+
     public static class RotaMetrics {
         public double toplamUcret;
         public double toplamSure;
         public double toplamMesafe;
     }
 
-    /**
-     * Tüm rotaları DFS ile bulur (başlangıçID -> hedefID).
-     * Mevcut CustomRotaPlanlayici'nizde de benzer bir mantık var;
-     * isterseniz burayı kullanmaya gerek kalmayabilir.
-     */
+    
     public static List<List<Durak>> tumRotalariHesapla(Graph graph, String baslangicId, String hedefId) {
         List<List<Durak>> rotalar = new ArrayList<>();
         List<Durak> currentRoute = new ArrayList<>();
@@ -51,7 +47,7 @@ public class RotaPlanlayici {
                     dfs(graph, ns.getStopId(), hedefId, currentRoute, rotalar);
                 }
             }
-            // Transfer (bus->tram vb.)
+         
             if (current.getTransfer() != null) {
                 dfs(graph, current.getTransfer().getTransferStopId(), hedefId, currentRoute, rotalar);
             }
@@ -61,13 +57,7 @@ public class RotaPlanlayici {
         currentRoute.remove(currentRoute.size() - 1);
     }
 
-    /**
-     * Verilen rota (Durak listesi) için:
-     *  - Toplam ücret
-     *  - Toplam süre
-     *  - Toplam mesafe
-     * değerlerini hesaplar.
-     */
+ 
     public static RotaMetrics hesaplaRotaMetrics(List<Durak> rota) {
         RotaMetrics metrics = new RotaMetrics();
 
@@ -90,7 +80,7 @@ public class RotaPlanlayici {
                 }
             }
 
-            // 2) Transfer kontrol edelim (bus->tram vs.)
+            // 2) Transfer kontrol edelim
             if (!edgeBulundu && current.getTransfer() != null
                     && current.getTransfer().getTransferStopId().equals(next.getId())) {
                 metrics.toplamUcret  += current.getTransfer().getTransferUcret();
@@ -105,7 +95,7 @@ public class RotaPlanlayici {
                         current.getLat(), current.getLon(),
                         next.getLat(),    next.getLon()
                 );
-                // Yürüme => ücret = 0, süre isterseniz yaklaşıksal ekleyin
+                
                 metrics.toplamMesafe += walkingDist;
             }
         }
